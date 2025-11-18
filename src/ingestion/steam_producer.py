@@ -2,6 +2,14 @@ import time
 import signal
 from datetime import datetime
 
+from src.ingestion.steam_client import SteamAPIClient
+from src.ingestion.kafka_producer import SteamKafkaProducer
+
+
+from src.utils.logger import setup_logging, get_logger
+setup_logging()
+logger = get_logger(__name__)
+
 class SteamDataProducer:
     """Main service for producing Steam data to Kafka"""
     
@@ -11,16 +19,16 @@ class SteamDataProducer:
         self.kafka_producer = SteamKafkaProducer()
         self.running = False
         
-        # Setup graceful shutdown
-        signal.signal(signal.SIGINT, self._signal_handler)   # Ctrl+C
-        signal.signal(signal.SIGTERM, self._signal_handler)  # Kill command
+    #     # Setup graceful shutdown
+    #     signal.signal(signal.SIGINT, self._signal_handler)   # Ctrl+C
+    #     signal.signal(signal.SIGTERM, self._signal_handler)  # Kill command
     
-    def _signal_handler(self, signum, frame):
-        """Handle shutdown gracefully"""
-        logger.info(f"Received signal {signum}, shutting down...")
-        self.running = False
+    # def _signal_handler(self, signum, frame):
+    #     """Handle shutdown gracefully"""
+    #     logger.info(f"Received signal {signum}, shutting down...")
+    #     self.running = False
 
-    def fetch_and_publish_player_data(self, steam_ids: List[str]) -> int:
+    def fetch_and_publish_player_data(self, steam_ids: list[str]) -> int:
         """
         Fetch player data from Steam and publish to Kafka
         
@@ -129,7 +137,7 @@ class SteamDataProducer:
                 logger.error(f"Error fetching/publishing recent games: {e}")
                 return 0
 
-    def run_continuous(self, steam_ids: List[str], interval: int = 300):
+    def run_continuous(self, steam_ids: list[str], interval: int = 300):
             """
             Run continuous data collection.
             
@@ -161,9 +169,9 @@ class SteamDataProducer:
                             break
                         
                         # Fetch owned games (less frequently to respect rate limits)
-                        if iteration % 10 == 0:  # Every 10 iterations
-                            games = self.fetch_and_publish_game_data(steam_id)
-                            total_games += games
+                        # if iteration % 10 == 0:  # Every 10 iterations
+                        games = self.fetch_and_publish_game_data(steam_id)
+                        total_games += games
                         
                         # Fetch recently played games
                         recent = self.fetch_and_publish_recent_games(steam_id)
@@ -205,7 +213,7 @@ class SteamDataProducer:
 def main():
     """Main entry point."""
     example_steam_ids = [
-        '76561197960435530',  # Gabe
+        '76561198307954663',
     ]
     
     logger.info("=" * 60)
