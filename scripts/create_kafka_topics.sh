@@ -21,3 +21,4 @@ create_topic() {
 create_topic "steam.players" 3 1
 create_topic "steam.games" 3 1
 create_topic "steam.stats" 3 1
+create_topic "steam.game_info" 3 1

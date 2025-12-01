@@ -214,6 +214,7 @@ def main():
     """Main entry point."""
     example_steam_ids = [
         '76561198307954663',
+        '76561198202353058'
     ]
     
     logger.info("=" * 60)

@@ -165,7 +165,119 @@ class SnowflakeManager:
             """
             cursor.execute(stats_ddl)
             logger.info(f"Table {self.settings.table_stats} created/verified")
-            
+
+            # Create GAME_INFO table (global game metadata from SteamSpy)
+            game_info_ddl = f"""
+            CREATE TABLE IF NOT EXISTS {self.settings.table_game_info} (
+                appid INTEGER PRIMARY KEY,
+                name VARCHAR(1000),
+                developer VARCHAR(500),
+                publisher VARCHAR(500),
+                owners VARCHAR(100),
+                owners_variance VARCHAR(100),
+                players_forever INTEGER,
+                players_2weeks INTEGER,
+                average_forever INTEGER,
+                average_2weeks INTEGER,
+                median_forever INTEGER,
+                median_2weeks INTEGER,
+                ccu INTEGER,
+                price INTEGER,
+                initialprice INTEGER,
+                discount INTEGER,
+                languages VARCHAR(2000),
+                genre VARCHAR(500),
+                tags VARIANT,
+                positive INTEGER,
+                negative INTEGER,
+                fetched_at TIMESTAMP_NTZ,
+                source VARCHAR(100),
+                inserted_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+                updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+            )
+            """
+            cursor.execute(game_info_ddl)
+            logger.info(f"Table {self.settings.table_game_info} created/verified")
+
+            # Create GAME_REVIEWS table (for sentiment analysis)
+            game_reviews_ddl = f"""
+            CREATE TABLE IF NOT EXISTS {self.settings.table_game_reviews} (
+                review_id VARCHAR(255) PRIMARY KEY,
+                appid INTEGER,
+                game_name VARCHAR(1000),
+                recommendationid VARCHAR(255),
+                steamid VARCHAR(255),
+                playtime_forever INTEGER,
+                playtime_at_review INTEGER,
+                voted_up BOOLEAN,
+                votes_up INTEGER,
+                votes_funny INTEGER,
+                weighted_vote_score FLOAT,
+                review_text VARCHAR(10000),
+                timestamp_created TIMESTAMP_NTZ,
+                timestamp_updated TIMESTAMP_NTZ,
+                language VARCHAR(50),
+                comment_count INTEGER,
+                steam_purchase BOOLEAN,
+                received_for_free BOOLEAN,
+                fetched_at TIMESTAMP_NTZ,
+                source VARCHAR(100),
+                inserted_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+                updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+            )
+            """
+            cursor.execute(game_reviews_ddl)
+            logger.info(f"Table {self.settings.table_game_reviews} created/verified")
+
+            # Create GAME_DETAILS table (for descriptions, used in recommendations)
+            game_details_ddl = f"""
+            CREATE TABLE IF NOT EXISTS {self.settings.table_game_details} (
+                appid INTEGER PRIMARY KEY,
+                name VARCHAR(1000),
+                type VARCHAR(100),
+                required_age INTEGER,
+                is_free BOOLEAN,
+                detailed_description VARCHAR(50000),
+                short_description VARCHAR(5000),
+                about_the_game VARCHAR(50000),
+                supported_languages VARCHAR(2000),
+                header_image VARCHAR(500),
+                website VARCHAR(500),
+                developers VARIANT,
+                publishers VARIANT,
+                categories VARIANT,
+                genres VARIANT,
+                release_date VARCHAR(100),
+                coming_soon BOOLEAN,
+                metacritic_score INTEGER,
+                metacritic_url VARCHAR(500),
+                recommendations_total INTEGER,
+                achievements_total INTEGER,
+                price_overview VARIANT,
+                fetched_at TIMESTAMP_NTZ,
+                source VARCHAR(100),
+                inserted_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+                updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+            )
+            """
+            cursor.execute(game_details_ddl)
+            logger.info(f"Table {self.settings.table_game_details} created/verified")
+
+            # Create GAME_PLAYER_COUNTS table (real-time player counts - TIME SERIES)
+            player_counts_ddl = f"""
+            CREATE TABLE IF NOT EXISTS {self.settings.table_player_counts} (
+                record_id VARCHAR(255) PRIMARY KEY,
+                appid INTEGER,
+                game_name VARCHAR(1000),
+                live_player_count INTEGER,
+                fetched_at TIMESTAMP_NTZ,
+                source VARCHAR(100),
+                inserted_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+            )
+            """
+            cursor.execute(player_counts_ddl)
+            logger.info(f"Table {self.settings.table_player_counts} created/verified")
+
         finally:
             cursor.close()
     

@@ -40,7 +40,8 @@ class SteamKafkaProducer:
         self.topics = {
             'players': settings.kafka.topic_players,
             'games': settings.kafka.topic_games,
-            'stats': settings.kafka.topic_stats
+            'stats': settings.kafka.topic_stats,
+            'game_info': settings.kafka.topic_game_info
         }
 
     def send_player_data(self, player_data: dict[str, any], key: Optional[str] = None):
@@ -68,13 +69,24 @@ class SteamKafkaProducer:
     def send_stats_data(self, stats_data: dict[str, any], key: Optional[str] = None) -> None:
         """
         Send stats data to Kafka.
-        
+
         Args:
             stats_data: Stats data dictionary
             key: Optional message key (combination of steam_id and app_id)
         """
         topic = self.topics['stats']
         self._send_message(topic, stats_data, key)
+
+    def send_game_info_data(self, game_info: dict[str, any], key: Optional[str] = None) -> None:
+        """
+        Send game info data to Kafka.
+
+        Args:
+            game_info: Game info dictionary from SteamSpy
+            key: Optional message key (appid recommended)
+        """
+        topic = self.topics['game_info']
+        self._send_message(topic, game_info, key)
 
     def _send_message(self, topic: str, data: dict[str, any], key: Optional[str] = None):
         """

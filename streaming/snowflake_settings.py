@@ -19,6 +19,10 @@ class SnowflakeSettings(BaseSettings):
     table_players: str = Field('PLAYERS', env='SNOWFLAKE_TABLE_PLAYERS')
     table_games: str = Field('GAMES', env='SNOWFLAKE_TABLE_GAMES')
     table_stats: str = Field('PLAYER_STATS', env='SNOWFLAKE_TABLE_STATS')
+    table_game_info: str = Field('GAME_INFO', env='SNOWFLAKE_TABLE_GAME_INFO')
+    table_game_reviews: str = Field('GAME_REVIEWS', env='SNOWFLAKE_TABLE_GAME_REVIEWS')
+    table_game_details: str = Field('GAME_DETAILS', env='SNOWFLAKE_TABLE_GAME_DETAILS')
+    table_player_counts: str = Field('GAME_PLAYER_COUNTS', env='SNOWFLAKE_TABLE_PLAYER_COUNTS')
     
     model_config = SettingsConfigDict(env_file='.env', extra='ignore', case_sensitive=True)
 

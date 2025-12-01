@@ -14,6 +14,7 @@ class KafkaSettings(BaseSettings):
     topic_players: str = Field('steam.players', env='KAFKA_TOPIC_PLAYERS')
     topic_games: str = Field('steam.games', env='KAFKA_TOPIC_GAMES')
     topic_stats: str = Field('steam.stats', env='KAFKA_TOPIC_STATS')
+    topic_game_info: str = Field('steam.game_info', env='KAFKA_TOPIC_GAME_INFO')
 
     acks: str = 'all'
     retries: int = 3
