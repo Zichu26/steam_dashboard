@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import os
 import time
 from openai import OpenAI
+from typing import List, Dict
 
 # Initialize OpenAI client
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
@@ -232,6 +233,92 @@ def get_game_reviews_sample(game_id, limit=10):
     df = pd.read_sql(query, conn)
     return df
 
+def get_random_reviews(conn, app_id: int, max_reviews: int = 500) -> List[str]:
+    """
+    Return up to max_reviews random review texts for the given app_id from GAME_REVIEWS in snowflake
+    """
+    sql = """
+        SELECT review_text
+        FROM GAME_REVIEWS
+        WHERE appid = %s
+        ORDER BY RANDOM()
+        LIMIT %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, (app_id, max_reviews))
+        rows = cur.fetchall()
+
+    # rows is list of tuples (review_text,)
+    return [r[0] for r in rows]
+
+def _summarize_chunk_of_reviews(reviews: List[str]) -> str:
+    joined = "\n\n---\n\n".join(reviews)
+
+    system_prompt = (
+        "You an expert in video game reviewing and are summarizing many Steam game reviews.\n"
+        "Given multiple raw reviews, produce a concise summary with:\n"
+        "- Overall sentiment (positive/neutral/negative + 1–2 sentences),\n"
+        "- Top pros (bullet list),\n"
+        "- Top cons (bullet list),\n"
+        "- Any major recurring issues or controversies.\n"
+        "- Anything that's recently changed that players mention.\n"
+        "Be opinionated but faithful to the reviews and structure the output in a quick-to-read but complete format and do not invent any new details."
+    )
+    user_prompt = f"Here are the reviews:\n\n{joined}"
+
+    resp = openai_client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.3,
+    )
+    return resp.choices[0].message.content.strip()
+
+
+def summarize_reviews_map_reduce(all_reviews: List[str], chunk_size: int = 100) -> str:
+    """
+    Map-reduce style summarization:
+      - map: summarize chunks of reviews
+      - reduce: summarize those summaries into one final summary
+    """
+    if not all_reviews:
+        return "No reviews available to summarize."
+
+    # MAP: summarize each chunk
+    chunk_summaries: List[str] = []
+    for i in range(0, len(all_reviews), chunk_size):
+        chunk: List[str] = all_reviews[i:i + chunk_size]
+        chunk_summaries.append(_summarize_chunk_of_reviews(chunk))
+
+    if len(chunk_summaries) == 1:
+        return chunk_summaries[0]
+
+    # Reduce / summarize chunk summaries
+    joined = "\n\n====\n\n".join(chunk_summaries)
+
+    system_prompt = (
+        "You are combining several grouped review summaries of Steam game reviews into a single, coherent report.\n"
+        "Write:\n"
+        "- One short paragraph describing the overall sentiment and player mood.\n"
+        "- A short bullet list of top pros players mention.\n"
+        "- A short bullet list of top cons players mention.\n"
+        "- Any noteworthy controversies or performance issues.\n"
+        "It is important that you do not invent or come up with any new details.\n"
+        "Only use and reference details that appears in the provided summaries."
+    )
+    user_prompt = f"Here are partial summaries from different batches of reviews:\n\n{joined}"
+
+    resp = openai_client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.2,
+    )
+    return resp.choices[0].message.content.strip()
 
 def get_game_recommendations_ai(game_name, game_description, available_games):
     """Use OpenAI to get smart game recommendations with explanations"""
@@ -687,6 +774,52 @@ def render_game_recommender():
     except Exception as e:
         st.warning(f"Recommendation engine not available. Error: {e}")
 
+def render_ai_reviews_summary():
+    """Renders the epic AI powered auto-generated game reviews summary section of the dashboard"""
+    st.markdown('<p class="section-header">AI Game Reviews Summary</p>', unsafe_allow_html=True)
+    st.caption("Summarizes user reviews using OpenAI GPT")
+
+    # Make sure OpenAI is configured
+    if openai_client is None:
+        st.info("OpenAI API key not configured. bruh")
+        return
+
+    try:
+        # Get top games for selection (same as recommender)
+        top_games: pd.DataFrame = get_live_leaderboard(100)
+
+        if top_games.empty:
+            st.info("No game data available for review summaries.")
+            return
+
+        game_options: Dict[str, int] = dict(zip(top_games['GAME_NAME'], top_games['GAME_ID']))
+
+        selected_game: str = st.selectbox(
+            "Select a game to summarize reviews for",
+            list(game_options.keys()),
+            key="summary_game"
+        )
+
+        max_reviews: int = st.slider("Number of reviews to sample", 100, 1000, 500, step=100, key="summary_max_reviews")
+
+        if selected_game and st.button("Generate AI Review Summary"):
+            game_id: int = game_options[selected_game]
+
+            conn = get_snowflake_connection()
+            # List[str], not DataFrame
+            all_reviews: List[str] = get_random_reviews(conn, game_id, max_reviews=max_reviews)
+
+            if all_reviews:
+                with st.spinner("Summarizing reviews with AI..."):
+                    summary: str = summarize_reviews_map_reduce(all_reviews, chunk_size=100)
+
+                st.markdown(f"### Review Summary for {selected_game}")
+                st.markdown(summary)
+            else:
+                st.info("No reviews available for this game.")
+
+    except Exception as e:
+        st.warning(f"AI review summarization not available. Error: {e}")
 
 def main():
     """Main dashboard layout"""
@@ -699,7 +832,15 @@ def main():
 
         page = st.radio(
             "Select View",
-            ["Full Dashboard", "Live Leaderboard", "Games by Tag", "User Profile", "Sentiment Analysis", "Game Recommender"],
+            [
+                "Full Dashboard",
+                "Live Leaderboard",
+                "Games by Tag",
+                "User Profile",
+                "Sentiment Analysis",
+                "Game Recommender",
+                "AI Reviews Summary"
+            ],
             key="nav"
         )
 
@@ -757,6 +898,9 @@ def main():
 
     elif page == "Game Recommender":
         render_game_recommender()
+
+    elif page == "AI Reviews Summary":
+        render_ai_reviews_summary()
 
 
 if __name__ == "__main__":
